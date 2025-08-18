@@ -45,6 +45,23 @@ class Transformer(nn.Module):
         return output
 
     def make_src_mask(self, src):
+        # 分析点1：
+        # (src != self.src_pad_idx) 返回一个布尔类型的张量，用于注意力机制屏蔽填充位置。
+        # 假设 src = [[5, 8, 3, 1, 1], [7, 2, 1, 1, 1]]， pad_idx 是 1 ，
+        # (src != 1) = [[True, True, True, False, False],
+        #               [True, True, False, False, False]]
+        # 分析点2：
+        # unsqueeze会在指定位置插入一个大小为1的新维度。
+        # 解释：
+        # 第1维(1)：自动广播到所有注意力头
+        # 第2维(1)：自动广播到所有目标位置
+        # 结果：每个注意力头、每个目标位置都使用相同的源序列掩码
+        # 效果：
+        # 原始掩码: [batch_size, src_len]  # 每个序列的掩码
+        #        ↓ unsqueeze(1)
+        #        [batch_size, 1, src_len]
+        #        ↓ unsqueeze(2)
+        #        [batch_size, 1, 1, src_len]  # 最终形状
         src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
         return src_mask
 

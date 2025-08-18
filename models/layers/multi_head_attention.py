@@ -14,6 +14,13 @@ class MultiHeadAttention(nn.Module):
         super(MultiHeadAttention, self).__init__()
         self.n_head = n_head
         self.attention = ScaleDotProductAttention()
+        # nn.Linear 是 PyTorch 中的全连接层（线性变换层），作用是对输入进行线性变换
+        # y = xW^T + b
+        #   • x 是输入向量
+        #   • W 是权重矩阵
+        #   • b 是偏置向量
+        #   • y 是输出向量
+        # ^T 表示转置操作。
         self.w_q = nn.Linear(d_model, d_model)
         self.w_k = nn.Linear(d_model, d_model)
         self.w_v = nn.Linear(d_model, d_model)
@@ -48,6 +55,12 @@ class MultiHeadAttention(nn.Module):
         batch_size, length, d_model = tensor.size()
 
         d_tensor = d_model // self.n_head
+        # 通过transpose交换张量的两个维度，
+        # 目的：将注意力头维度移到前面，便于后续矩阵乘法。使q @ k_t计算时维度对齐。
+        # 效果如下：
+        # 原始: [batch, seq_len, n_head, d_k]
+        #        ↓ transpose(1, 2)
+        #     结果: [batch, n_head, seq_len, d_k]
         tensor = tensor.view(batch_size, length, self.n_head, d_tensor).transpose(1, 2)
         # it is similar with group convolution (split by number of heads)
 
@@ -62,6 +75,14 @@ class MultiHeadAttention(nn.Module):
         """
         batch_size, head, length, d_tensor = tensor.size()
         d_model = head * d_tensor
-
+        # transpose(1, 2): 将head维度移回原始位置
+        # contiguous(): 确保内存连续，便于view操作
+        # view(): 重塑张量形状，合并多头结果
+        # 维度变化：
+        # 输入: [batch_size, head, length, d_tensor]
+        #        ↓ transpose(1, 2)
+        #        [batch_size, length, head, d_tensor]
+        #        ↓ contiguous().view()
+        # 输出: [batch_size, length, d_model]  # d_model = head * d_tensor
         tensor = tensor.transpose(1, 2).contiguous().view(batch_size, length, d_model)
         return tensor
