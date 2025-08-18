@@ -29,6 +29,7 @@ class Encoder(nn.Module):
         x = self.emb(x)
 
         for layer in self.layers:
+            # layer作为Callable对象，这样使用的时候，就可以调用 EncoderLayer 的 forward 方法。
             x = layer(x, src_mask)
 
         return x

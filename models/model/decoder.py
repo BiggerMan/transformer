@@ -31,6 +31,7 @@ class Decoder(nn.Module):
         trg = self.emb(trg)
 
         for layer in self.layers:
+            # layer作为Callable对象，这样使用的时候，就可以调用 DecoderLayer 的 forward 方法。
             trg = layer(trg, enc_src, trg_mask, src_mask)
 
         # pass to LM head

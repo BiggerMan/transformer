@@ -8,6 +8,106 @@ My own implementation Transformer model (Attention is All You Need - Google Brai
 ![model](image/model.png)
 <br><br>
 
+总体代码结构：
+```shell
+Transformer
+    ├── Encoder
+    │   ├── TransformerEmbedding (Token + Positional)
+    │   └── EncoderLayer × N
+    │       ├── MultiHeadAttention
+    │       ├── LayerNorm
+    │       └── PositionwiseFeedForward
+    ├── Decoder
+    │   ├── TransformerEmbedding (Token + Positional)
+    │   └── DecoderLayer × N
+    │       ├── Masked MultiHeadAttention (self-attention)
+    │       ├── MultiHeadAttention (encoder-decoder attention)
+    │       ├── LayerNorm
+    │       └── PositionwiseFeedForward
+```
+
+## 0. 基础知识：
+
+### 通用的pytorch训练模板
+参考`pytorch_train_model_template.py`，当前仓库也是使用pytorch通用的训练主循环。
+
+核心不变要素:
+- 训练/评估模式切换 
+- 梯度清零→前向→反向→更新 
+- 损失监控和梯度管理
+
+### train参数中iterator 的来源和生成原理
+
+  #### 1. 数据来源
+
+  Multi30k 英德翻译数据集：
+
+  • 训练集：29,000 句对
+  • 验证集：1,014 句对
+  • 测试集：1,000 句对
+
+  #### 2. 生成流程
+
+  ##### 步骤1：Tokenizer配置
+    ```python
+    # util/tokenizer.py
+    tokenizer = Tokenizer()  # 使用spaCy分词器
+    tokenize_en = 英文分词器
+    tokenize_de = 德文分词器
+    ```
+
+  ##### 步骤2：DataLoader初始化
+    ```python
+    # data.py
+    loader = DataLoader(
+        ext=('.en', '.de'),  # 文件扩展名
+        tokenize_en=tokenizer.tokenize_en,
+        tokenize_de=tokenizer.tokenize_de,
+        init_token='<sos>',
+        eos_token='<eos>'
+    )
+    ```
+
+  ##### 步骤3：数据集创建
+    ```python
+    # 自动下载并分割数据集
+    train, valid, test = loader.make_dataset()
+    ```
+
+  ##### 步骤4：词汇表构建
+    ```python
+    loader.build_vocab(train_data=train, min_freq=2)
+    # 建立词汇表，过滤低频词
+    ```
+
+  ##### 步骤5：Iterator生成
+    ```python
+    # 关键代码：BucketIterator.splits()
+    train_iter, valid_iter, test_iter = BucketIterator.splits(
+        (train, valid, test),
+        batch_size=128,  # 来自conf.py
+        device=device    # GPU/CPU
+    )
+    ```
+
+  #### 3. Iterator特性
+
+  • BucketIterator：自动将相似长度的序列分到同一batch
+  • 批次数据格式：batch.src, batch.trg
+  • 形状：[seq_len, batch_size]（时间步优先）
+  • 掩码处理：自动处理padding和掩码
+
+  #### 4. 实际使用
+    ```python
+    for batch in train_iter:
+        src = batch.src  # [src_len, batch_size]
+        trg = batch.trg  # [trg_len, batch_size]
+        # 直接用于训练
+    ```
+
+
+
+
 ## 1. Implementations
 
 ### 1.1 Positional Encoding
@@ -169,6 +269,15 @@ class ScaleDotProductAttention(nn.Module):
 ### 1.4 Layer Norm
 
 ![model](image/layer_norm.jpg)
+
+LayerNorm（层归一化）是对神经网络中单个样本的所有特征（理解为一行）进行归一化的技术<br>
+```
+output = (x - mean) / sqrt(var + eps) * γ + β
+```
+位置：每个子层（注意力、前馈网络）之后。<br>
+效果：防止梯度消失/爆炸，提高训练稳定性。<br>
+与之相对的是，BatchNorm（批量归一化）是对神经网络中所有特征（理解为一列）进行归一化的技术。<br>
+与BatchNorm区别：不依赖batch size（因为Size可能会变），适合序列模型。<br>
     
 ```python
 class LayerNorm(nn.Module):
