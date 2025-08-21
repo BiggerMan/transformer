@@ -52,23 +52,51 @@ scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
 criterion = nn.CrossEntropyLoss(ignore_index=src_pad_idx)
 
 
+# 是通用的PyTorch训练模板，适用于大多数序列到序列模型。
 def train(model, iterator, optimizer, criterion, clip):
+    """
+    训练模型
+    :param model: 模型，这里是要训练的Transformer模型实例
+    :param iterator: 数据迭代器，提供批次数据（包含src和trg）
+    :param optimizer: 优化器，用于更新模型参数（学习率调度）
+    :param criterion: 损失函数，计算预测与真实标签的差异
+    :param clip: 梯度裁剪，防止梯度爆炸
+    :return: 每个epoch的损失
+    """
+    #  步骤                        │ 通用模式                                  │ Transformer特化
+    #   ─────────────────────────┼───────────────────────────────────────────┼─────────────────────
+    #    输入处理                 │ 批次数据加载                              │ 序列移位技巧
+    #    损失计算                 │ CrossEntropyLoss                          │ 忽略padding
+    #    梯度处理                 │ 裁剪防爆炸                                │ 序列模型常见
+    #    训练循环                 │ 标准epoch/batch                           │ 教师强制训练
+
+    # 模型设置为训练模式
     model.train()
+    # 初始化每个epoch的损失为0
     epoch_loss = 0
     for i, batch in enumerate(iterator):
+        # 数据准备
         src = batch.src
         trg = batch.trg
-
+        # 梯度清零，因为pytorch默认会累加梯度而非覆盖，为了防止梯度爆炸，所以每次清零，每次只使用当前批量的梯度。
         optimizer.zero_grad()
-        output = model(src, trg[:, :-1])
+        # 前向传播：学生做题得到答案
+        # 反向传播：老师批改，告诉学生哪里错了
+        # 更新：学生根据错误调整学习方法
+        # 模型前向传播，pytorch会自动构建计算图用于反向传播
+        output = model(src, trg[:, :-1])  # 解码器输入去掉最后一个token
+        # 维度重塑
         output_reshape = output.contiguous().view(-1, output.shape[-1])
-        trg = trg[:, 1:].contiguous().view(-1)
-
+        trg = trg[:, 1:].contiguous().view(-1)  # 目标去掉第一个token
+        # 损失计算
         loss = criterion(output_reshape, trg)
+        # 反向传播
         loss.backward()
+        # 梯度裁剪（防爆炸）
         torch.nn.utils.clip_grad_norm_(model.parameters(), clip)
+        # 参数更新
         optimizer.step()
-
+        # 损失累加
         epoch_loss += loss.item()
         print('step :', round((i / len(iterator)) * 100, 2), '% , loss :', loss.item())
 

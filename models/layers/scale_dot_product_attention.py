@@ -26,6 +26,7 @@ class ScaleDotProductAttention(nn.Module):
         # [batch_size, head, length, d_tensor]
         batch_size, head, length, d_tensor = k.size()
 
+        # 计算相似度的公式：Attention(q, k, v) = softmax(q @ k_t / sqrt(d_k)) @ v
         # 1. dot product Query with Key^T to compute similarity
         k_t = k.transpose(2, 3)  # transpose
         score = (q @ k_t) / math.sqrt(d_tensor)  # scaled dot product

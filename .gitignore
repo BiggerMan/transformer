@@ -3,5 +3,6 @@ data/
 venv/
 .data/
 *.pt
+.idea/
 __pycache__
 result/
