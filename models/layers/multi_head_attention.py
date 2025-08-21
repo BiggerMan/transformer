@@ -3,6 +3,8 @@
 @when : 2019-10-25
 @homepage : https://github.com/gusdnd852
 """
+import os
+import torch
 from torch import nn
 
 from models.layers.scale_dot_product_attention import ScaleDotProductAttention
@@ -41,7 +43,12 @@ class MultiHeadAttention(nn.Module):
         out = self.w_concat(out)
 
         # 5. visualize attention map
-        # TODO : we should implement visualization
+        # 将注意力矩阵保存到一个文件里，之后用matplotlib，做它的变化过程的可视化。
+        # 保存attention矩阵到文件
+        if not os.path.exists('result'):
+            os.makedirs('result')
+        filename = "result/tensor_changes.pt"
+        torch.save(attention, filename)
 
         return out
 

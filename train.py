@@ -4,6 +4,7 @@
 @homepage : https://github.com/gusdnd852
 """
 import math
+import os
 import time
 
 from torch import nn, optim
@@ -21,7 +22,7 @@ def count_parameters(model):
 
 def initialize_weights(m):
     if hasattr(m, 'weight') and m.weight.dim() > 1:
-        nn.init.kaiming_uniform(m.weight.data)
+        nn.init.kaiming_uniform_(m.weight.data)
 
 
 model = Transformer(src_pad_idx=src_pad_idx,
@@ -45,7 +46,6 @@ optimizer = Adam(params=model.parameters(),
                  eps=adam_eps)
 
 scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer,
-                                                 verbose=True,
                                                  factor=factor,
                                                  patience=patience)
 
@@ -155,6 +155,10 @@ def run(total_epoch, best_loss):
         if valid_loss < best_loss:
             best_loss = valid_loss
             torch.save(model.state_dict(), 'saved/model-{0}.pt'.format(valid_loss))
+
+        # 如果没有result文件夹，就创建一个
+        if not os.path.exists('result'):
+            os.makedirs('result')
 
         f = open('result/train_loss.txt', 'w')
         f.write(str(train_losses))
